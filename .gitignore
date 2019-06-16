@@ -1,0 +1,6 @@
+.ipynb_checkpoints/
+src/.pytest_cache/
+.idea/
+vhdl/*
+!vhdl/*.tcl
+!vhdl/tb*

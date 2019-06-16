@@ -1,0 +1,57 @@
+""" Run all test using this class """
+
+import numpy as np
+import scipy.signal as signal
+
+from src.Decimator import Decimator
+from src.NCO import NCO
+
+class TestThemAll(object):
+    """ Collection of tests """
+
+    def test_Decimator(self, sigType=complex):
+        """ Run test of polyphase decimator. Some decimator with factor 4 is used.
+            - sigType - data type of input data in [float, complex]
+        """
+
+        decF = 4
+        nFilt = decF * 16
+        filt = signal.firwin2(nFilt, [0., 1/4/decF, 1/2/decF, 1.], [1., 1., 0., 0.])
+        filt = filt / np.sum(filt)
+        decImpl = ('int', 16)
+
+        dec = Decimator(filt, decF, dtype=sigType, impl=decImpl)
+
+        if sigType == float:
+            sig = np.cos(2 * np.pi * .05 / 16 * np.arange(5000)) + .5 * np.cos(
+                2 * np.pi * 3 * .05 / 16 * np.arange(5000))
+        else:
+            sig = np.exp(1j * 2 * np.pi * .05 / 16 * np.arange(5000)) + .5 * np.exp(
+                1j * 2 * np.pi * 3 * .05 / 16 * np.arange(5000))
+
+        sigSc = 12
+        sigNorm =  .99 * sig / max(sig) * (2**(sigSc-1)-1) / (2**(sigSc-1))
+        sigInt = np.round(sigNorm * 2**(sigSc-1))
+
+        decFmax = 16
+
+        tb = dec.test_rtl(sigInt, sigSc, decFmax)
+        tb.config_sim(trace=False)
+        tb.run_sim()
+
+    def test_NCO(self, f0=216, fs=10000, ampl=np.sqrt(2.), phi0=.1,
+                 impl=('int', (32, 10, 12))):
+        """ Run test of quadrature Numeric Controlled Oscillator.
+        :param f0: frequency of generated complex exponential;
+        :param fs: sampling frequency;
+        :param ampl: amplitude of cosine/sine waveforms;
+        :param phi0: initial phase in [0, 1];
+        :param impl: implementation, 'int' (integer) is required, 2nd
+            argument is (phW, ROMadrW, outW), where
+            - phW - bitwidth of NCO phase, integer > 0
+            - ROMadrW - bitwidth of ROM address with sine/cosine samples (1/4-period ROM)
+            - outW - bitwidth of NCO output sample, integer > 0
+        :return:
+        """
+        nco = NCO(f0, fs, ampl=ampl, phi0=phi0, impl=impl)
+        nco.test_rtl()
