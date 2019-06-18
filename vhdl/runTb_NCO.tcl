@@ -1,28 +1,27 @@
 # To start ModelSim and source this script from the command line, type this:
-#       vsim -do runTb_PolyphaseDecimator.tcl
+#       vsim -do runTb_NCO.tcl
 # Or, if ModelSim is already running with the correct working directory, type this in the ModelSim main window:
-#       source runTb_PolyphaseDecimator.tcl
+#       source runTb_NCO.tcl
 
 
 
 set library_file_list {
                         design {pck_myhdl_011.vhd
-                                PolyphaseDecimator.vhd}
-                        test   {tb_PolyphaseDecimator.vhd}
+                                NCO.vhd}
+                        test   {tb_NCO.vhd}
 }
 
-set top_level   work.tb_PolyphaseDecimator
+set top_level   work.tb_NCO
 set wave_patterns {
                     /*
 }
 set wave_radices {
-                        decimal {i_coeff i_d_I i_d_Q o_d_I o_d_Q}
-                        hexadecimal {i_coeffAdr}
-                        unsigned {i_decF}
+                        decimal {o_cos o_sin}
+                        unsigned {i_fw i_ph0}
                         
 }
 
-proc r  {} {uplevel #0 source runTb_PolyphaseDecimator.tcl}
+proc r  {} {uplevel #0 source runTb_NCO.tcl}
 proc rr {} {global last_compile_time
             set last_compile_time 0
             r                            }
