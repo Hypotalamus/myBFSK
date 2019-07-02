@@ -2,9 +2,11 @@
 
 import numpy as np
 import scipy.signal as signal
+import pytest
 
 from src.Decimator import Decimator
 from src.NCO import NCO
+from src.Resampler import Resampler
 
 class TestThemAll(object):
     """ Collection of tests """
@@ -55,3 +57,36 @@ class TestThemAll(object):
         """
         nco = NCO(f0, fs, ampl=ampl, phi0=phi0, impl=impl)
         nco.test_rtl()
+
+    @pytest.mark.parametrize("ratio", {5/9, 1., np.sqrt(2)})
+    def test_Resampler(self, ratio, sigType=complex):
+        """ Run test of resampler.
+            - ratio - resampling ratio;
+            - sigType - data type of input data in [float, complex]
+        """
+
+        N = 4096
+        taps = 16
+        nFilt = N * taps
+        filt = signal.firwin2(nFilt, [0., .35 / N, .5 / N, 1.], [1., 1., 0., 0.])
+        filt = N * filt / np.sum(filt)
+        impl = ('int', (16, 30))
+
+        res = Resampler(ratio, filt, N, dtype=sigType, impl=impl)
+
+        if sigType == float:
+            sig = (np.cos(2 * np.pi * 1/50 * np.arange(1000)) + 1.2 * np.cos(
+                2 * np.pi * 3 * 1/50 * np.arange(1000)) -
+                   .3 * np.cos( 2 * np.pi * 3.5 * 1/50 * np.arange(1000)))
+        else:
+            sig = (np.exp(1j * 2 * np.pi * 1/50 * np.arange(1000)) + 1.2 * np.exp(
+                1j * 2 * np.pi * 3 * 1/50 * np.arange(1000)) -
+                   .3 * np.exp(1j * 2 * np.pi * 3.5 * 1/50 * np.arange(1000)))
+
+        sigSc = 12
+        sigNorm =  .99 * sig / max(sig) * (2**(sigSc-1)-1) / (2**(sigSc-1))
+        sigInt = np.round(sigNorm * 2**(sigSc-1))
+
+        tb = res.test_rtl(sigInt, sigSc)
+        tb.config_sim(trace=False)
+        tb.run_sim()

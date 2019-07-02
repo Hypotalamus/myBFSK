@@ -20,6 +20,9 @@ class RTLblocks(object):
         - SingleAsRdRAM - Single-Port RAM with Asynchronous Read;
         - MAC - Multiply-accumulate block;
         - CMult - Complex multiplier
+        - SFIFO - Synchronous (one-clock domain) FIFO (first word fall through type)
+        - DualAsRdRAM - Dual-Port RAM with Asynchronous Read
+        - Reg - Simple register
     """
 
     @staticmethod
@@ -288,6 +291,52 @@ class RTLblocks(object):
             o_empty.next = empty
             o_full.next = full
             o_ovflo.next = ovflo
+
+        return instances()
+
+    @staticmethod
+    @block
+    def DualAsRdRAM(i_clk, i_d, i_wren, i_addrWr, i_addrRd, o_d):
+        """ Dual-Port RAM with Asynchronous Read
+            ~~~~ input ports ~~~~
+            - i_clk - clock;
+            - i_d - data to write;
+            - i_wren - write enable;
+            - i_addrWr - write address;
+            - i_addrRd - read address;
+            ~~~~ output ports ~~~~
+            - o_d - read data;
+        """
+        mem = [Signal(intbv(0, min=i_d.min, max=i_d.max)) for _ in
+               range(i_addrWr.max)]
+
+        @always(i_clk.posedge)
+        def write():
+            if i_wren:
+                mem[i_addrWr].next = i_d
+
+        @always_comb
+        def read():
+            o_d.next = mem[i_addrRd]
+
+        return instances()
+
+    @staticmethod
+    @block
+    def Reg(i_clk, i_rst, i_ce, i_d, o_d):
+        """ Simple register
+            ~~~~ input ports ~~~~
+            - i_clk - clock;
+            - i_rst - synchronous reset;
+            - i_ce - clock enable;
+             - i_d - input data;
+             ~~~~ output ports ~~~~
+             - o_d - output data;
+        """
+        @always_seq(i_clk.posedge, i_rst)
+        def ffs():
+            if i_ce:
+                o_d.next = i_d
 
         return instances()
 
