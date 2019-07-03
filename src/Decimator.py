@@ -137,33 +137,26 @@ class Decimator(object):
             cBank.next = i_coeffAdr[:len(cAdr)]
             cAdr.next = i_coeffAdr[len(cAdr):]
 
-        @always(i_clk.posedge)
+        @always_seq(i_clk.posedge, reset=i_rst)
         def coeffDMX():
-            if i_rst:
+            if i_coeffLd:
+                for ii in range(len(memWrEn)):
+                    if ii == cBank:
+                        memWrEn[ii].next = i_coeffWr
+                    else:
+                        memWrEn[ii].next = False
+                coeffIn.next = i_coeff
+                cAdrReg.next = cAdr
+            else:
                 for ii in range(len(memWrEn)):
                     memWrEn[ii].next = False
                 coeffIn.next = 0
-                cAdrReg.next = 0
-                cAdrReg2.next = 0
-            else:
-                if i_coeffLd:
-                    for ii in range(len(memWrEn)):
-                        if ii == cBank:
-                            memWrEn[ii].next = i_coeffWr
-                        else:
-                            memWrEn[ii].next = False
-                    coeffIn.next = i_coeff
-                    cAdrReg.next = cAdr
-                else:
-                    for ii in range(len(memWrEn)):
-                        memWrEn[ii].next = False
-                    coeffIn.next = 0
-                    if i_dv:
-                        if cAdrReg >= i_decF:
-                            cAdrReg.next = 0
-                        else:
-                            cAdrReg.next = cAdrReg + 1
-                cAdrReg2.next = cAdrReg
+                if i_dv:
+                    if cAdrReg >= i_decF:
+                        cAdrReg.next = 0
+                    else:
+                        cAdrReg.next = cAdrReg + 1
+            cAdrReg2.next = cAdrReg
 
         # decimate input data
 
@@ -195,30 +188,23 @@ class Decimator(object):
             filtRegsI = [Signal(intbv(0, min=fGain * MACoutMin, max=fGain * MACoutMax)) for _ in range(nTaps)]
             filtRegsQ = [Signal(intbv(0, min=fGain * MACoutMin, max=fGain * MACoutMax)) for _ in range(nTaps)]
 
-            @always(i_clk.posedge)
+            @always_seq(i_clk.posedge, reset=i_rst)
             def filt():
-                if i_rst:
-                    for ii in range(nTaps):
-                        filtRegsI[ii].next = 0
-                        filtRegsQ[ii].next = 0
-                    accClr.next = False
-                    filtV.next = False
+                if i_dv and (cAdrReg == i_decF):
+                    accClr.next = True
                 else:
-                    if i_dv and (cAdrReg == i_decF):
-                        accClr.next = True
-                    else:
-                        accClr.next = False
-                    if i_dv and (cAdrReg2 == i_decF):
-                        for ii in range(nTaps):
-                            if ii == 0:
-                                filtRegsI[ii].next = MACoutI[ii]
-                                filtRegsQ[ii].next = MACoutQ[ii]
-                            else:
-                                filtRegsI[ii].next = MACoutI[ii] + filtRegsI[ii - 1]
-                                filtRegsQ[ii].next = MACoutQ[ii] + filtRegsQ[ii - 1]
-                        filtV.next = True
-                    else:
-                        filtV.next = False
+                    accClr.next = False
+                if i_dv and (cAdrReg2 == i_decF):
+                    for ii in range(nTaps):
+                        if ii == 0:
+                            filtRegsI[ii].next = MACoutI[ii]
+                            filtRegsQ[ii].next = MACoutQ[ii]
+                        else:
+                            filtRegsI[ii].next = MACoutI[ii] + filtRegsI[ii - 1]
+                            filtRegsQ[ii].next = MACoutQ[ii] + filtRegsQ[ii - 1]
+                    filtV.next = True
+                else:
+                    filtV.next = False
 
             oMax = len(i_d.I) + self.cSc - 1
             oMin = self.cSc - 1
@@ -242,27 +228,21 @@ class Decimator(object):
 
             filtRegs = [Signal(intbv(0, min=fGain * MACoutMin, max=fGain * MACoutMax)) for _ in range(nTaps)]
 
-            @always(i_clk.posedge)
+            @always_seq(i_clk.posedge, reset=i_rst)
             def filt():
-                if i_rst:
-                    for ii in range(nTaps):
-                        filtRegs[ii].next = 0
-                    accClr.next = False
-                    filtV.next = False
+                if i_dv and (cAdrReg == i_decF):
+                    accClr.next = True
                 else:
-                    if i_dv and (cAdrReg == i_decF):
-                        accClr.next = True
-                    else:
-                        accClr.next = False
-                    if i_dv and (cAdrReg2 == i_decF):
-                        for ii in range(nTaps):
-                            if ii == 0:
-                                filtRegs[ii].next = MACout[ii]
-                            else:
-                                filtRegs[ii].next = MACout[ii] + filtRegs[ii - 1]
-                        filtV.next = True
-                    else:
-                        filtV.next = False
+                    accClr.next = False
+                if i_dv and (cAdrReg2 == i_decF):
+                    for ii in range(nTaps):
+                        if ii == 0:
+                            filtRegs[ii].next = MACout[ii]
+                        else:
+                            filtRegs[ii].next = MACout[ii] + filtRegs[ii - 1]
+                    filtV.next = True
+                else:
+                    filtV.next = False
 
             oMax = len(i_d) + self.cSc - 1
             oMin = self.cSc - 1
@@ -290,7 +270,7 @@ class Decimator(object):
         cBankLen = int(np.ceil(np.log2(decFmax)))
         cAdrLen = int(np.ceil(np.log2(nTaps)) + cBankLen)
         i_clk = Signal(bool(0))
-        i_rst = Signal(bool(0))
+        i_rst = ResetSignal(0, active=bool(1), isasync=False)
         if self.dtype == float:
             i_d = Signal(intbv(0, min=-2 ** (dW - 1), max=2 ** (dW - 1)))
             o_d = Signal(intbv(0, min=-2 ** (dW - 1), max=2 ** (dW - 1)))
@@ -466,7 +446,7 @@ class Decimator(object):
         cBankLen = int(np.ceil(np.log2(decFmax)))
         cAdrLen = int(np.ceil(np.log2(nTaps)) + cBankLen)
         i_clk = Signal(bool(0))
-        i_rst = Signal(bool(0))
+        i_rst = ResetSignal(0, active=bool(1), isasync=False)
         if self.dtype == float:
             i_d = Signal(intbv(0, min=-2 ** (dW - 1), max=2 ** (dW - 1)))
             o_d = Signal(intbv(0, min=-2 ** (dW - 1), max=2 ** (dW - 1)))

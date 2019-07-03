@@ -156,24 +156,17 @@ class NCO(object):
             cos.next = ROM1[int(adr)]
             sin.next = ROM2[int(adr)]
 
-        @always(i_clk.posedge)
+        @always_seq(i_clk.posedge, reset=i_rst)
         def intRegs():
-            if i_rst:
-                acc.next = 0
-                outSel.next = 0
-            else:
-                if i_ce:
-                    acc.next = acc + i_fw
-                    outSel.next = ph[:len(ph) - 2]
+            if i_ce:
+                acc.next = acc + i_fw
+                outSel.next = ph[:len(ph) - 2]
 
         if i_ph0 is not None:
-            @always(i_clk.posedge)
+            @always_seq(i_clk.posedge, reset=i_rst)
             def regs_opt():
-                if i_rst:
-                    ph.next = 0
-                else:
-                    if i_ce:
-                        ph.next = acc + i_ph0
+                if i_ce:
+                    ph.next = acc + i_ph0
         elif i_ph0 is None:
             @always_comb
             def wires_opt():
@@ -183,25 +176,21 @@ class NCO(object):
         def wires():
             adr.next = ph[len(ph) - 2:len(ph) - 2 - len(adr)]
 
-        @always(i_clk.posedge)
+        @always_seq(i_clk.posedge, reset=i_rst)
         def quadSel():
-            if i_rst:
-                outCos.next = 0
-                outSin.next = 0
-            else:
-                if i_ce:
-                    if outSel == 0:
-                        outCos.next = cos
-                        outSin.next = sin
-                    elif outSel == 1:
-                        outCos.next = 0 - sin
-                        outSin.next = cos
-                    elif outSel == 2:
-                        outCos.next = 0 - cos
-                        outSin.next = 0 - sin
-                    elif outSel == 3:
-                        outCos.next = sin
-                        outSin.next = 0 - cos
+            if i_ce:
+                if outSel == 0:
+                    outCos.next = cos
+                    outSin.next = sin
+                elif outSel == 1:
+                    outCos.next = 0 - sin
+                    outSin.next = cos
+                elif outSel == 2:
+                    outCos.next = 0 - cos
+                    outSin.next = 0 - sin
+                elif outSel == 3:
+                    outCos.next = sin
+                    outSin.next = 0 - cos
 
         @always_comb
         def output():
@@ -225,7 +214,7 @@ class NCO(object):
                                      " But current implementation is %s " % self.iType)
         delayRTL = 3
         i_clk = Signal(bool(0))
-        i_rst = Signal(bool(0))
+        i_rst = ResetSignal(0, active=bool(1), isasync=False)
         i_fw = Signal(modbv(0)[self.phW:])
         i_ph0 = Signal(modbv(int(self.phi0 * 2 ** self.phW))[self.phW:])
         i_ce = Signal(bool(0))
@@ -302,7 +291,7 @@ class NCO(object):
             - path - destination folder, string
         """
         i_clk = Signal(bool(0))
-        i_rst = Signal(bool(0))
+        i_rst = ResetSignal(0, active=bool(1), isasync=False)
         i_fw = Signal(intbv(0)[self.phW:])
         if isPhi0:
             i_ph0 = Signal(intbv(0)[self.phW:])

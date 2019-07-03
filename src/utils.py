@@ -78,18 +78,14 @@ class RTLblocks(object):
             accIn = Signal(intbv(0, min=-2 ** (wAcc - 1), max=2 ** (wAcc - 1)))
         acc = Signal(accIn.val)
 
-        @always(i_clk.posedge)
+        @always_seq(i_clk.posedge, reset=i_rst)
         def regs():
-            if i_rst:
-                mult.next = 0
-                acc.next = 0
-            else:
-                if i_dv:
-                    mult.next = i_d1 * i_d2
-                    if i_accClr:
-                        acc.next = 0
-                    else:
-                        acc.next = accIn
+            if i_dv:
+                mult.next = i_d1 * i_d2
+                if i_accClr:
+                    acc.next = 0
+                else:
+                    acc.next = accIn
 
         @always_comb
         def intComb():
@@ -143,39 +139,23 @@ class RTLblocks(object):
             d2I.next = i_d2.I
             d2Q.next = i_d2.Q
 
-        @always(i_clk.posedge)
+        @always_seq(i_clk.posedge, reset=i_rst)
         def regs():
-            if i_rst:
-                d1I_reg.next = 0
-                d1Q_reg.next = 0
-                d2I_reg.next = 0
-                d2Q_reg.next = 0
-                s1.next = 0
-                s2.next = 0
-                p1.next = 0
-                p2.next = 0
-                p3.next = 0
-                p3_reg.next = 0
-                s3.next = 0
-                s3_reg.next = 0
-                s4.next = 0
-                s5.next = 0
-            else:
-                if i_dv:
-                    d1I_reg.next = d1I
-                    d1Q_reg.next = d1Q
-                    d2I_reg.next = d2I
-                    d2Q_reg.next = d2Q
-                    s1.next = d1I + d1Q
-                    s2.next = d2I + d2Q
-                    p1.next = d1I_reg * d2I_reg
-                    p2.next = d1Q_reg * d2Q_reg
-                    p3.next = s1 * s2
-                    p3_reg.next = p3
-                    s3.next = p1 - p2
-                    s3_reg.next = s3
-                    s4.next = p1 + p2
-                    s5.next = p3_reg - s4
+            if i_dv:
+                d1I_reg.next = d1I
+                d1Q_reg.next = d1Q
+                d2I_reg.next = d2I
+                d2Q_reg.next = d2Q
+                s1.next = d1I + d1Q
+                s2.next = d2I + d2Q
+                p1.next = d1I_reg * d2I_reg
+                p2.next = d1Q_reg * d2Q_reg
+                p3.next = s1 * s2
+                p3_reg.next = p3
+                s3.next = p1 - p2
+                s3_reg.next = s3
+                s4.next = p1 + p2
+                s5.next = p3_reg - s4
 
         @always_comb
         def output():
@@ -333,7 +313,7 @@ class RTLblocks(object):
              ~~~~ output ports ~~~~
              - o_d - output data;
         """
-        @always_seq(i_clk.posedge, i_rst)
+        @always_seq(i_clk.posedge, reset=i_rst)
         def ffs():
             if i_ce:
                 o_d.next = i_d
