@@ -1,9 +1,12 @@
 """ File with some auxiliary classes and functions
     - IQdata -  Complex data type for myHDL blocks, class
     - RTLblocks - Set of rtl-blocks writing in myHDL, class
+    - Osc - Model of the Oscillator, class
+    - PCMFM - Model of PCM/FM modulator, class
 """
 
 import numpy as np
+import scipy.signal as signal
 from myhdl import *
 
 class IQdata(object):
@@ -319,6 +322,142 @@ class RTLblocks(object):
                 o_d.next = i_d
 
         return instances()
+
+
+class Osc(object):
+    """ Model of the Oscillator """
+
+    def __init__(self, fs, fc, ampl, tau):
+        """
+            fs - sampling frequency
+            fc - carrier frequency
+            ampl - amplitude of signal
+            tau - time constant
+        """
+        self.fs = float(fs)
+        self.fc = float(fc)
+        self.ampl = float(ampl)
+        self.tau = float(tau)
+        self.alpha = 1. - np.exp(- 1 / self.tau / self.fs)
+        self.iir_num = np.array([1.])
+        self.iir_den = np.array(np.array([1., -(1 - self.alpha)]))
+
+        self.zi = 0. * signal.lfilter_zi(self.iir_num, self.iir_den)
+        self.amplCur = 0
+        self.phaseCur = -self.fc
+        self._OscOn = False
+        self.buffer = np.array([], dtype=float)
+
+    def switch(self, on):
+        """ turn on/off oscillator
+            on - boolean, Osc on if True, else - Osc off
+        """
+        self._OscOn = bool(on)
+
+    def generateOut(self, t):
+        """ Generate Oscillator output to internal buffer
+            t - duration of generated output in seconds
+        """
+        blockLen = int(t * self.fs)
+        freqs = self.fc * np.ones(blockLen)
+        self._genIntVCO(freqs)
+
+    def _genIntVCO(self, freqs):
+        """ Form frequency modulated signal
+            freqs - list of frequency values in time instants
+        """
+        phases = self.phaseCur + 2 * np.pi / self.fs * np.cumsum(freqs)
+        phases %= 2 * np.pi
+        amplVec = self.ampl * self._OscOn * self.alpha * np.ones_like(freqs)
+        amplVecFilt, filtDlys = signal.lfilter(self.iir_num, self.iir_den, amplVec, zi=self.zi)
+        self.zi = filtDlys
+        wave = amplVecFilt * np.cos(phases)
+        self.phaseCur = phases[-1]
+        self.buffer = np.append(self.buffer, wave)
+
+    def read(self, t):
+        """ Read samples from internal buffer
+            t - duration of read data in seconds
+        """
+        blockLen = int(t * self.fs)
+        if blockLen > len(self.buffer):
+            buffer = np.hstack((self.buffer, np.zeros(blockLen - len(self.buffer))))
+        else:
+            buffer = self.buffer[:blockLen]
+            self.buffer = np.delete(self.buffer, np.arange(blockLen))
+        return buffer
+
+    def readAll(self):
+        """ Read all samples from internal buffer
+        """
+        buffer = np.copy(self.buffer)
+        self.buffer = np.array([], dtype=float)
+        return buffer
+
+    def getBufferTime(self):
+        """ Get buffer length in seconds """
+        bufferLen = float(len(self.buffer))
+        return bufferLen / self.fs
+
+    def automateSwitch(self, init, moments):
+        """ Fill buffer switching oscillator in instants from moments
+            init - initial oscillator state, boolean
+            moments - array with time instants where oscillator is turned, last value define duration of last time segment
+        """
+        swState = init
+        self.switch(swState)
+        curTime = 0.
+        for moment in moments:
+            self.generateOut(moment - curTime)
+            curTime = moment
+            swState = ~swState
+            self.switch(swState)
+        swState = ~swState
+        self.switch(swState)
+
+
+class PCMFM(Osc):
+    """ Model of PCM/FM modulator """
+
+    def __init__(self, fs, fc, ampl, tau, df, R, filt=None):
+        """
+            fs - sampling frequency
+            fc - carrier frequency
+            ampl - amplitude of signal
+            tau - time constant of amplitude changing
+            df - frequency deviation, 1'b0 - fc - df; 1'b1 - fc + df
+            R - bitRate
+            filt - premodulation filter, (filt_num, dilt_den)
+        """
+        super().__init__(fs, fc, ampl, tau)
+        self.df = float(df)
+        self.R = float(R)
+        self.symbLen = int(np.round(self.fs / self.R))
+        self.filt = filt
+        if filt:
+            self.filt_zi = self.fc * signal.lfilter_zi(self.filt[0], self.filt[1])
+
+    def modulateOut(self, bits):
+        """ Modulate data and put it to internal buffer
+            bits - data bits, integer from (0, 1) set, array
+        """
+        symb = 2 * bits - 1
+        symbFull = np.tile(symb[:, np.newaxis], self.symbLen).flatten()
+        freqs = self.fc + self.df * symbFull
+        if self.filt:
+            freqs, self.filt_zi = signal.lfilter(self.filt[0], self.filt[1], freqs, zi=self.filt_zi)
+        self._genIntVCO(freqs)
+        return (symbFull + 1) * .5
+
+    def generateOut(self, t):
+        """ Generate Oscillator output to internal buffer
+            t - duration of generated output in seconds
+        """
+        blockLen = int(t * self.fs)
+        freqs = self.fc * np.ones(blockLen)
+        if self.filt:
+            freqs, self.filt_zi = signal.lfilter(self.filt[0], self.filt[1], freqs, zi=self.filt_zi)
+        self._genIntVCO(freqs)
 
 if __name__ == "__main__":
 
