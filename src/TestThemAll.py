@@ -7,6 +7,7 @@ import pytest
 from src.Decimator import Decimator
 from src.NCO import NCO
 from src.Resampler import Resampler
+from src.CORDIC import CORDIC
 
 class TestThemAll(object):
     """ Collection of tests """
@@ -56,7 +57,9 @@ class TestThemAll(object):
         :return:
         """
         nco = NCO(f0, fs, ampl=ampl, phi0=phi0, impl=impl)
-        nco.test_rtl()
+        tb = nco.test_rtl()
+        tb.config_sim(trace=False)
+        tb.run_sim()
 
     @pytest.mark.parametrize("ratio", {5/9, 1., np.sqrt(2)})
     def test_Resampler(self, ratio, sigType=complex):
@@ -88,5 +91,19 @@ class TestThemAll(object):
         sigInt = np.round(sigNorm * 2**(sigSc-1))
 
         tb = res.test_rtl(sigInt, sigSc)
+        tb.config_sim(trace=False)
+        tb.run_sim()
+
+    def test_CORDIC(self, dBw=12, cordBw=16, cordBwInt=19, stQnt=17,
+                    rndQnt=int(1e4)):
+        """ Run test of CORDIC processor
+            - dBw - input data (I and Q) bitwidth;
+            - cordBw - output angle bitwidth;
+            - cordBwInt - internal data bitwidth;
+            - stQnt - number of rotational stages;
+            - rndQnt - number of test random data
+        """
+        cord = CORDIC(dBw, cordBw, stQnt, cordBwInt)
+        tb = cord.test_rtl(randQnt=rndQnt)
         tb.config_sim(trace=False)
         tb.run_sim()
