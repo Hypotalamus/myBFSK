@@ -283,14 +283,18 @@ class CORDIC(object):
                 # round output
         if self.cordBwInt > self.cordBw:
             p5 = 1 << self.cordBwInt - self.cordBw - 1
+            angNorm = Signal(intbv(0, min=rotAngI.min, max=rotAngI.max))
+
+            @always_comb
+            def getAngNorm():
+                angNorm.next = (rotAngI + p5) >> (self.cordBwInt - self.cordBw)
 
             @always_comb
             def outWRound():
-                tmp = intbv((rotAngI + p5) >> (self.cordBwInt - self.cordBw), min=rotAngI.min, max=rotAngI.max)
-                if tmp == 2 ** (self.cordBw - 1):
+                if angNorm == 2 ** (self.cordBw - 1):
                     o_ang.next = 2 ** (self.cordBw - 1) - 1
                 else:
-                    o_ang.next = tmp
+                    o_ang.next = angNorm
                 o_dv.next = rotInV
 
         else:

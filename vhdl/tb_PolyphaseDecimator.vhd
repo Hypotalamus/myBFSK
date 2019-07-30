@@ -6,6 +6,9 @@ use ieee.STD_LOGIC_TEXTIO.all;
 
 use std.env.finish;
 
+library design;
+use design.PolyphaseDecimator;
+
 entity tb_PolyphaseDecimator is
 end tb_PolyphaseDecimator;
 

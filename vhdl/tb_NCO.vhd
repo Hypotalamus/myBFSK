@@ -6,6 +6,9 @@ use ieee.std_logic_textio.all;
 
 use std.env.finish;
 
+library design;
+use design.NCO;
+
 entity tb_NCO is
 end tb_NCO;
 

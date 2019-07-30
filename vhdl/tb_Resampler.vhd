@@ -6,6 +6,9 @@ use ieee.STD_LOGIC_TEXTIO.all;
 
 use std.env.finish;
 
+library design;
+use design.Resampler;
+
 entity tb_Resampler is
 end tb_Resampler;
 
